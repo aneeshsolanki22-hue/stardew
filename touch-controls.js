@@ -91,7 +91,12 @@
 	const root = document.createElement("div");
 	root.id = "tc";
 	root.innerHTML = `
-		<div id="tc-stick"><div id="tc-nub"></div></div>
+		<div id="tc-dpad" role="group" aria-label="Move">
+			<button type="button" data-dir="up" style="grid-area:up" aria-label="Up">▲</button>
+			<button type="button" data-dir="left" style="grid-area:left" aria-label="Left">◀</button>
+			<button type="button" data-dir="right" style="grid-area:right" aria-label="Right">▶</button>
+			<button type="button" data-dir="down" style="grid-area:down" aria-label="Down">▼</button>
+		</div>
 		<div id="tc-actions">
 			<button type="button" data-act="map" style="grid-area:map">Map</button>
 			<button type="button" data-act="menu" style="grid-area:menu">Menu</button>
@@ -139,23 +144,19 @@
 			border-color: rgba(255, 228, 176, 0.85);
 			transform: scale(0.95);
 		}
-		#tc-stick {
+		#tc-dpad {
 			position: absolute; pointer-events: auto;
-			left: calc(20px + env(safe-area-inset-left));
-			bottom: calc(24px + env(safe-area-inset-bottom));
-			width: 138px; height: 138px; border-radius: 50%;
-			border: 1.5px solid rgba(255, 236, 200, 0.26);
-			background: radial-gradient(circle, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.03) 55%, rgba(255, 255, 255, 0) 62%);
-			box-shadow: inset 0 0 28px rgba(0, 0, 0, 0.3), 0 6px 22px rgba(0, 0, 0, 0.3);
+			left: calc(18px + env(safe-area-inset-left));
+			bottom: calc(22px + env(safe-area-inset-bottom));
+			display: grid; gap: 6px;
+			grid-template-columns: repeat(3, clamp(46px, 13vw, 60px));
+			grid-template-rows: repeat(3, clamp(46px, 13vw, 60px));
+			grid-template-areas: ". up ." "left . right" ". down .";
 			touch-action: none;
 		}
-		#tc-nub {
-			position: absolute; left: 50%; top: 50%; width: 58px; height: 58px;
-			margin: -29px 0 0 -29px; border-radius: 50%;
-			background: radial-gradient(circle at 38% 32%, rgba(255, 245, 224, 0.55), rgba(255, 240, 210, 0.22));
-			border: 1.5px solid rgba(255, 240, 210, 0.5);
-			box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
-			transition: transform 0.04s linear;
+		#tc-dpad button {
+			display: flex; align-items: center; justify-content: center;
+			padding: 0; border-radius: 14px; font-size: 15px;
 		}
 		#tc-actions {
 			position: absolute; pointer-events: none;
@@ -189,7 +190,7 @@
 		.tc-key[data-key="space"] { flex: 4 1 0; max-width: 300px; }
 		.tc-row:last-child .tc-key[data-key="enter"] { max-width: 140px; }
 		.tc-key.on { background: rgba(255, 214, 138, 0.36); border-color: rgba(255, 228, 176, 0.8); }
-		#tc.kb-open #tc-stick, #tc.kb-open #tc-actions { visibility: hidden; }
+		#tc.kb-open #tc-dpad, #tc.kb-open #tc-actions { visibility: hidden; }
 		#tc-toast {
 			position: absolute; left: 50%; bottom: 46%; max-width: 78vw;
 			transform: translate(-50%, 6px); opacity: 0;
@@ -198,78 +199,75 @@
 			font-size: 12px; line-height: 1.4; letter-spacing: 0.02em; text-transform: none;
 			transition: opacity 0.18s ease, transform 0.18s ease; pointer-events: none;
 		}
-		#tc-toast.show { opacity: 1; transform: translate(-50%, 0); }
-		@media (max-width: 500px) {
-			#tc-stick { width: 116px; height: 116px; }
-			#tc-nub { width: 50px; height: 50px; margin: -25px 0 0 -25px; }
-		}`;
+		#tc-toast.show { opacity: 1; transform: translate(-50%, 0); }`;
 	document.head.append(style);
 
-	// --- joystick ------------------------------------------------------------
-	const stick = root.querySelector("#tc-stick");
-	const nub = root.querySelector("#tc-nub");
+	// --- d-pad ---------------------------------------------------------------
+	// Four buttons, one pointer surface. The pad is read as eight 45° sectors
+	// around its centre with a dead middle, so a straight-up press is always
+	// straight up (a real pinch of the buttons would drift), a press near a
+	// corner walks diagonally, and a thumb can slide from one arm to another
+	// without lifting. That's what makes it more precise than the old stick.
+	const dpad = root.querySelector("#tc-dpad");
+	const padButtons = {};
+	for (const button of dpad.querySelectorAll("[data-dir]")) padButtons[button.dataset.dir] = button;
 	const directions = { up: false, down: false, left: false, right: false };
-	let stickPointer = null;
-	let centerX = 0;
-	let centerY = 0;
-	let radius = 0;
+	let padPointer = null;
+	let padX = 0;
+	let padY = 0;
+	let padRadius = 0;
 
 	function setDirections(next) {
 		for (const dir of ["up", "down", "left", "right"]) {
 			const want = !!next[dir];
 			if (want === directions[dir]) continue;
 			directions[dir] = want;
+			padButtons[dir].classList.toggle("on", want);
 			if (want) press("move:" + dir, KEYS[dir]);
 			else release("move:" + dir);
 		}
 	}
 
-	function moveStick(x, y) {
-		let dx = x - centerX;
-		let dy = y - centerY;
-		const dist = Math.hypot(dx, dy);
-		const travel = radius * 0.6;
-		if (dist > travel) {
-			dx = (dx / dist) * travel;
-			dy = (dy / dist) * travel;
+	function aimPad(x, y) {
+		const dx = x - padX;
+		const dy = y - padY;
+		const next = {};
+		if (Math.hypot(dx, dy) > padRadius * 0.32) {
+			// 0 = right, 2 = down, 4 = left, 6 = up, odd sectors are diagonals.
+			const sector = (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8;
+			if (sector === 0 || sector === 1 || sector === 7) next.right = true;
+			if (sector === 3 || sector === 4 || sector === 5) next.left = true;
+			if (sector === 1 || sector === 2 || sector === 3) next.down = true;
+			if (sector === 5 || sector === 6 || sector === 7) next.up = true;
 		}
-		nub.style.transform = `translate(${dx}px, ${dy}px)`;
-		const dead = radius * 0.24;
-		setDirections({
-			left: dx < -dead,
-			right: dx > dead,
-			up: dy < -dead,
-			down: dy > dead,
-		});
+		setDirections(next);
 	}
 
-	stick.addEventListener("pointerdown", (event) => {
-		if (stickPointer !== null) return;
+	dpad.addEventListener("pointerdown", (event) => {
+		if (padPointer !== null) return;
+		if (event.pointerType === "mouse" && event.button !== 0) return;
 		event.preventDefault();
-		stickPointer = event.pointerId;
-		try { stick.setPointerCapture(event.pointerId); } catch {}
-		const box = stick.getBoundingClientRect();
-		centerX = box.left + box.width / 2;
-		centerY = box.top + box.height / 2;
-		radius = box.width / 2;
-		moveStick(event.clientX, event.clientY);
-		stick.classList.add("on");
+		padPointer = event.pointerId;
+		try { dpad.setPointerCapture(event.pointerId); } catch {}
+		const box = dpad.getBoundingClientRect();
+		padX = box.left + box.width / 2;
+		padY = box.top + box.height / 2;
+		padRadius = box.width / 2;
+		aimPad(event.clientX, event.clientY);
 	});
 
-	stick.addEventListener("pointermove", (event) => {
-		if (event.pointerId === stickPointer) moveStick(event.clientX, event.clientY);
+	dpad.addEventListener("pointermove", (event) => {
+		if (event.pointerId === padPointer) aimPad(event.clientX, event.clientY);
 	});
 
-	function endStick(event) {
-		if (event.pointerId !== stickPointer) return;
-		stickPointer = null;
-		stick.classList.remove("on");
-		nub.style.transform = "";
+	function endPad(event) {
+		if (event.pointerId !== padPointer) return;
+		padPointer = null;
 		setDirections({});
 	}
-	stick.addEventListener("pointerup", endStick);
-	stick.addEventListener("pointercancel", endStick);
-	stick.addEventListener("lostpointercapture", endStick);
+	dpad.addEventListener("pointerup", endPad);
+	dpad.addEventListener("pointercancel", endPad);
+	dpad.addEventListener("lostpointercapture", endPad);
 
 	// --- momentary buttons ---------------------------------------------------
 	function bindMomentary(element, id, makeSpec) {

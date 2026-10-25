@@ -289,15 +289,8 @@
 	button.type = "button";
 	button.id = "sync-open";
 	button.textContent = "Sync";
-	const topBar = document.getElementById("tc-top");
-	if (topBar) topBar.append(button);
-	else {
-		button.style.cssText =
-			"position:fixed;z-index:9;top:14px;right:104px;height:40px;padding:0 14px;border-radius:12px;" +
-			"font:600 11px/1 -apple-system,sans-serif;letter-spacing:.06em;text-transform:uppercase;" +
-			"color:#f8eed8;background:rgba(26,20,14,.55);border:1.5px solid rgba(255,236,200,.3);cursor:pointer;";
-		document.body.append(button);
-	}
+	// Shared top-centre bar so the button never covers the game's clock.
+	(document.getElementById("hud-bar") || document.body).append(button);
 
 	const repoInput = panel.querySelector("#sync-repo");
 	const pathInput = panel.querySelector("#sync-path");

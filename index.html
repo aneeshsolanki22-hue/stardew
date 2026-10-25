@@ -32,11 +32,36 @@
 			width: 100%; height: 100%; display: block;
 			touch-action: none;
 		}
+		/* Type / Fit / Sync / Cheat live here. Top-centre, because the game draws
+		   its clock and date in the top-right corner. */
+		#hud-bar {
+			position: fixed; z-index: 9; left: 50%;
+			top: calc(12px + env(safe-area-inset-top));
+			transform: translateX(-50%);
+			display: flex; gap: 8px; pointer-events: none;
+		}
+		#hud-bar button {
+			pointer-events: auto; height: 40px; min-width: 62px; padding: 0 12px;
+			border-radius: 12px; cursor: pointer;
+			font: 600 11px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+			letter-spacing: 0.06em; text-transform: uppercase; color: #f8eed8;
+			background: rgba(26, 20, 14, 0.55); border: 1.5px solid rgba(255, 236, 200, 0.3);
+			-webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+			box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+			transition: transform 0.08s ease, background 0.08s ease, border-color 0.08s ease;
+			touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+		}
+		#hud-bar button.on, #hud-bar button:active {
+			background: rgba(255, 214, 138, 0.34);
+			border-color: rgba(255, 228, 176, 0.85);
+			transform: scale(0.95);
+		}
 	</style>
 </head>
 <body>
 	<div id="loading">Loading...</div>
 	<canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+	<div id="hud-bar"></div>
 	<!-- Loaded before game.js so the controls exist while the game downloads. -->
 	<script src="touch-controls.js"></script>
 	<script src="cheat-panel.js"></script>

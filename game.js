@@ -267,12 +267,17 @@ const w = Math.round(canvas.clientWidth * dpr) || 1280;
 const h = Math.round(canvas.clientHeight * dpr) || 720;
 await exports.WasmBootstrap.Init(w, h);
 
-new ResizeObserver(() => {
+// Re-measure the canvas and hand the new size to the runtime. Exposed for the
+// Fit button, which needs it in the Home Screen app where there is no
+// Fullscreen API to toggle.
+function refitCanvas() {
 	const dpr = window.devicePixelRatio || 1;
 	const nw = Math.round(canvas.clientWidth * dpr);
 	const nh = Math.round(canvas.clientHeight * dpr);
 	if (nw > 0 && nh > 0) try { exports.WasmBootstrap.Resize(nw, nh); } catch {}
-}).observe(canvas);
+}
+window.stardewRefit = refitCanvas;
+new ResizeObserver(refitCanvas).observe(canvas);
 
 try { void navigator.keyboard?.lock().catch(() => {}); } catch {}
 document.addEventListener("keydown", (e) => {

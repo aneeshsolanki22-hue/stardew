@@ -210,17 +210,9 @@
 	button.type = "button";
 	button.id = "cheat-open";
 	button.textContent = "Cheat";
-	const topBar = document.getElementById("tc-top");
-	if (topBar) {
-		button.className = topBar.firstElementChild?.className || "";
-		topBar.append(button);
-	} else {
-		button.style.cssText =
-			"position:fixed;z-index:9;top:14px;right:18px;height:40px;padding:0 14px;border-radius:12px;" +
-			"font:600 11px/1 -apple-system,sans-serif;letter-spacing:.06em;text-transform:uppercase;" +
-			"color:#f8eed8;background:rgba(26,20,14,.55);border:1.5px solid rgba(255,236,200,.3);cursor:pointer;";
-		document.body.append(button);
-	}
+	const topBar = document.getElementById("hud-bar");
+	// Shared top-centre bar so the button never covers the game's clock.
+	(topBar || document.body).append(button);
 
 	const moneyInput = panel.querySelector("#cheat-money");
 	const earnedInput = panel.querySelector("#cheat-earned");

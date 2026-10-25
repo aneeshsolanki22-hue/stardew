@@ -99,13 +99,20 @@
 			<button type="button" data-act="action" style="grid-area:action">Action</button>
 			<button type="button" data-act="tool" style="grid-area:tool">Tool</button>
 		</div>
-		<div id="tc-top">
-			<button type="button" id="tc-type">Type</button>
-			<button type="button" id="tc-fit">Fit</button>
-		</div>
 		<div id="tc-keyboard" hidden></div>
 		<div id="tc-toast" role="status" aria-live="polite"></div>`;
 	document.body.append(root);
+
+	// Type and Fit share the top-centre bar (#hud-bar in index.html) with Sync and
+	// Cheat, so no control lands on the game's clock in the top-right corner.
+	const hudBar = document.getElementById("hud-bar");
+	for (const id of ["tc-type", "tc-fit"]) {
+		const element = document.createElement("button");
+		element.type = "button";
+		element.id = id;
+		element.textContent = id === "tc-type" ? "Type" : "Fit";
+		(hudBar || root).append(element);
+	}
 
 	const style = document.createElement("style");
 	style.textContent = `
@@ -160,16 +167,6 @@
 		}
 		#tc-actions button {
 			pointer-events: auto; height: 54px; border-radius: 16px; padding: 0 6px;
-		}
-		#tc-top {
-			position: absolute; pointer-events: none;
-			right: calc(18px + env(safe-area-inset-right));
-			top: calc(14px + env(safe-area-inset-top));
-			display: flex; gap: 8px;
-		}
-		#tc-top button {
-			pointer-events: auto; height: 40px; min-width: 62px;
-			padding: 0 10px; border-radius: 12px; font-size: 11px;
 		}
 		#tc-keyboard {
 			position: absolute; left: 0; right: 0; bottom: 0; pointer-events: auto;
@@ -300,7 +297,7 @@
 
 	// --- on-screen keyboard --------------------------------------------------
 	const keyboard = root.querySelector("#tc-keyboard");
-	const typeButton = root.querySelector("#tc-type");
+	const typeButton = document.getElementById("tc-type");
 	const ROWS = [
 		["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
 		["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
@@ -357,10 +354,8 @@
 	});
 
 	// --- fit to screen -------------------------------------------------------
-	const fitButton = root.querySelector("#tc-fit");
-	// Launched from the Home Screen there is no browser chrome to fit around.
+	const fitButton = document.getElementById("tc-fit");
 	const installed = navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
-	if (installed) fitButton.hidden = true;
 	const toastElement = root.querySelector("#tc-toast");
 	let toastTimer = 0;
 
@@ -378,7 +373,12 @@
 		const current = document.fullscreenElement || document.webkitFullscreenElement;
 
 		if (!request) {
-			toast("This browser can't go fullscreen. Add the page to your Home Screen to play without browser bars.");
+			// Installed apps and iOS Safari have no Fullscreen API. The canvas already
+			// fills the display, so make the game re-measure it instead.
+			window.stardewRefit?.();
+			toast(installed
+				? "Re-fitted to the screen."
+				: "This browser can't go fullscreen. Add the page to your Home Screen to play without browser bars.");
 			return;
 		}
 		try {
@@ -389,6 +389,7 @@
 			await request.call(documentElement);
 			// Landscape is the playable orientation; ignore browsers that refuse.
 			try { await screen.orientation?.lock?.("landscape"); } catch {}
+			window.stardewRefit?.();
 		} catch {
 			toast("Fullscreen was blocked. Add the page to your Home Screen to play without browser bars.");
 		}
